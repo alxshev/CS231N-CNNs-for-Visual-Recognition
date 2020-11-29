@@ -33,8 +33,24 @@ def softmax_loss_naive(W, X, y, reg):
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    # First, we compute the function's output:
+    # Computes a matrix of shape (N, C), where each row corresponds
+    # to an item, with each column a class
+    F = X @ W 
+    # We interpret this as the unnormalized log probabilities. 
+    #First, let's shrink values to avoid overflow. 
+    # We do this by subtracting the maximum of each item from every element
+    F -= np.max(F, axis=1, keepdims=True)
 
+    # Now take the exponent, and normalize
+    F = np.exp(F)
+    F /= np.sum(F, axis=1, keepdims=True)
+
+    N = y.shape[0]
+    correctScores = F[range(N), y]
+    # print()
+    # print(np.log(correctScores))
+    loss = -np.log(correctScores).sum() / N + reg * (W * W).sum()
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     return loss, dW
