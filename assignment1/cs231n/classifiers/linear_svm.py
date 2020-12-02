@@ -83,11 +83,13 @@ def svm_loss_vectorized(W, X, y, reg):
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     N = X.shape[0]
-    M = X @ W
-    Correct = np.expand_dims(M[range(N), y], -1) # column vector representing correct classes for each item
-    xi = np.maximum(0, M - Correct + 1)
-    L = xi.sum() + reg * (W * W).sum()
-    L /= N
+    scoresMatrix = X @ W
+    correctClassesVector = np.expand_dims(scoresMatrix[range(N), y], -1) # column vector representing correct classes for each item
+    svmScoresMatrix = np.maximum(0, scoresMatrix - correctClassesVector + 1)
+    svmScoresMatrix[range(N), y] = 0
+    loss = svmScoresMatrix.sum() / N + reg * (W * W).sum()
+
+
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
@@ -101,8 +103,16 @@ def svm_loss_vectorized(W, X, y, reg):
     # loss.                                                                     #
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    # Mask = svmScoresMatrix != 0
+    # T = np.zeros((N,) + dW.shape)
+    # T += np.expand_dims(X, -1)
+    # T *= np.expand_dims(Mask, 1)
+    # Sums = T.sum(axis=2)
+    # T[range(N), :, y] -= Sums
+    # dW = T.sum(axis=0) / N + reg * 2 * W
 
-    pass
+    Mask = svmScoresMatrix != 0
+    
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 

@@ -79,9 +79,8 @@ class TwoLayerNet(object):
         # shape (N, C).                                                             #
         #############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-        pass
-
+        H = np.maximum(0, X @ W1 + b1)
+        scores = H @ W2 + b2
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
         # If the targets are not given then jump out, we're done
@@ -97,8 +96,11 @@ class TwoLayerNet(object):
         # classifier loss.                                                          #
         #############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-        pass
+        expScores = np.exp(scores)
+        sums = expScores.sum(axis=1)
+        itemLosses = -np.log(expScores[range(N), y] / sums)
+        L2 = lambda M: np.linalg.norm(M) ** 2
+        loss = (1.0 / N) * itemLosses.sum() + reg * (L2(W1) + L2(W2))
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
@@ -217,9 +219,10 @@ class TwoLayerNet(object):
         # TODO: Implement this function; it should be VERY simple!                #
         ###########################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-        pass
-
+        H = np.max(0, X @ self.parans['W1'] + self.params['b1'])
+        expH = np.exp(H)
+        sums = expH.sum(axis=1)
+        scores = expH.max(axis=0) / sums
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
         return y_pred

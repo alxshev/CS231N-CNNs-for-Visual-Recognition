@@ -32,7 +32,8 @@ def softmax_loss_naive(W, X, y, reg):
     # regularization!                                                           #
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+    N, D = X.shape
+    _, C = W.shape
     # First, we compute the function's output:
     # Computes a matrix of shape (N, C), where each row corresponds
     # to an item, with each column a class
@@ -48,9 +49,13 @@ def softmax_loss_naive(W, X, y, reg):
 
     N = y.shape[0]
     correctScores = F[range(N), y]
-    # print()
-    # print(np.log(correctScores))
     loss = -np.log(correctScores).sum() / N + reg * (W * W).sum()
+
+    # Finding the gradient
+    # grad 
+    # for i in range(N):
+    #     for j in range(C):
+    #         grad 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     return loss, dW
