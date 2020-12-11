@@ -83,13 +83,10 @@ def svm_loss_vectorized(W, X, y, reg):
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     N = X.shape[0]
-    scoresMatrix = X @ W
-    correctClassesVector = np.expand_dims(scoresMatrix[range(N), y], -1) # column vector representing correct classes for each item
-    svmScoresMatrix = np.maximum(0, scoresMatrix - correctClassesVector + 1)
-    svmScoresMatrix[range(N), y] = 0
-    loss = svmScoresMatrix.sum() / N + reg * (W * W).sum()
-
-
+    scores = X @ W
+    margins = np.maximum(0, scores - scores[range(N), y, None] + 1)
+    margins[range(N), y] = 0
+    loss = margins.sum() / N + reg * (W ** 2).sum()
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
@@ -103,17 +100,16 @@ def svm_loss_vectorized(W, X, y, reg):
     # loss.                                                                     #
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-    # Mask = svmScoresMatrix != 0
-    # T = np.zeros((N,) + dW.shape)
-    # T += np.expand_dims(X, -1)
-    # T *= np.expand_dims(Mask, 1)
-    # Sums = T.sum(axis=2)
-    # T[range(N), :, y] -= Sums
-    # dW = T.sum(axis=0) / N + reg * 2 * W
-
-    Mask = svmScoresMatrix != 0
-    
-
+    # for i in range(N):
+    #     dW += X[i, :, None]
+    #     num_nonzero = (margins[i, :] > 0).sum()
+    #     dW[:, y[i]] = -num_nonzero * X[i, :]
+    # dW = dW / N + 2 * W
+    nonzero_idx = margins > 0
+    dW += X.T @ nonzero_idx
+    # print(correct_class_derivative.shape)
+    # dW[range(N), y] -= correct_class_derivative
+    dW += 2 * W
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     return loss, dW
