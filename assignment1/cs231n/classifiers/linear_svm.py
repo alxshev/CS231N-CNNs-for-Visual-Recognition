@@ -83,6 +83,7 @@ def svm_loss_vectorized(W, X, y, reg):
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     N = X.shape[0]
+    C = W.shape[1]
     scores = X @ W
     margins = np.maximum(0, scores - scores[range(N), y, None] + 1)
     margins[range(N), y] = 0
@@ -104,12 +105,10 @@ def svm_loss_vectorized(W, X, y, reg):
     #     dW += X[i, :, None]
     #     num_nonzero = (margins[i, :] > 0).sum()
     #     dW[:, y[i]] = -num_nonzero * X[i, :]
-    # dW = dW / N + 2 * W
-    nonzero_idx = margins > 0
-    dW += X.T @ nonzero_idx
-    # print(correct_class_derivative.shape)
-    # dW[range(N), y] -= correct_class_derivative
-    dW += 2 * W
+    margin_count = margins[:]
+    margin_count[margins > 0] = 1
+    margin_count[range(N), y] -= margin_count.sum(axis=1)
+    dW = X.T @ margin_count / N + reg * 2 * W
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     return loss, dW
