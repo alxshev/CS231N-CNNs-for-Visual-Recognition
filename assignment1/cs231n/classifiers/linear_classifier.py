@@ -5,7 +5,7 @@ from builtins import object
 import numpy as np
 from cs231n.classifiers.linear_svm import *
 from cs231n.classifiers.softmax import *
-from past.builtins import xrange
+# from past.builtins import xrange
 
 
 class LinearClassifier(object):
@@ -104,7 +104,7 @@ class LinearClassifier(object):
         ###########################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        y_pred = (X @ self.W).argmax(axis=1)
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         return y_pred
