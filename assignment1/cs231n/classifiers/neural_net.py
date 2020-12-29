@@ -146,7 +146,7 @@ class TwoLayerNet(object):
 		Inputs:
 		- X: A numpy array of shape (N, D) giving training data.
 		- y: A numpy array f shape (N,) giving training labels; y[i] = c means that
-		  X[i] has label c, where 0 <= c < C.
+		  X[i] has label c, where 0 <= c < C.	
 		- X_val: A numpy array of shape (N_val, D) giving validation data.
 		- y_val: A numpy array of shape (N_val,) giving validation labels.
 		- learning_rate: Scalar giving learning rate for optimization.
