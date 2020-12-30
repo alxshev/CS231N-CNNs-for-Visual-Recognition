@@ -128,7 +128,7 @@ class TwoLayerNet(object):
 		# Backprop on biases
 		# Consider case with N = 1. dL/db2 = dL/dS2 * dS2/db2. 
 		# The first term is dS2. The second is just the identity matrix, so db2 = dS2
-		# We can generalize this to multiple examples my summing and averaging
+		# We can generalize this to multiple examples by summing their contributions
 		db2 = dS2.sum(axis=0)
 		db1 = dS1.sum(axis=0)
 		grads = {'W1': dW1, 'W2': dW2, 'b1': db1, 'b2': db2}
