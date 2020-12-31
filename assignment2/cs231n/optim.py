@@ -69,7 +69,9 @@ def sgd_momentum(w, dw, config=None):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    v = config["momentum"] * v - config["learning_rate"] * dw
+    w += v
+    next_w = w
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -107,8 +109,10 @@ def rmsprop(w, dw, config=None):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
-
+    decay_rate = config["decay_rate"]
+    config["cache"] = decay_rate * config["cache"] + (1 - decay_rate) * dw ** 2
+    w -= config["learning_rate"] * dw / (np.sqrt(config["cache"]) + config["epsilon"])
+    next_w = w
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
     #                             END OF YOUR CODE                            #
@@ -151,9 +155,27 @@ def adam(w, dw, config=None):
     # using it in any calculations.                                           #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    # beta1 is reminiscent of mu in momentum updates (also basically the learning rate)
+    # beta2 is the same learning rate decay from rmsprop, deriving from EMA filter
+     
+    config['t'] += 1
 
-    pass
+    m = config['m']
+    v = config['v']
+    t = config["t"]
+    # print(m.shape, v.shape, config['t'])
+    beta1, beta2 = config["beta1"], config["beta2"]
 
+    m = beta1 * m +   (1 - beta1) * dw # momentum part to smooth out the gradient
+    mt = m / (1 - beta1 ** t)
+    v = beta2 * v + (1 - beta2) * dw ** 2 # rmsprop/adagrad cache
+    vt = v / (1 - beta2 ** t)
+    w -= config["learning_rate"] * mt / (np.sqrt(vt) + config["epsilon"])
+    next_w = w
+
+    config["m"] = m
+    config['v'] = v
+    
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
     #                             END OF YOUR CODE                            #
