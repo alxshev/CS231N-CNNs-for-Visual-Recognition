@@ -6,7 +6,6 @@ pass
 from .layers import *
 from .fast_layers import *
 
-
 def affine_relu_forward(x, w, b):
     """
     Convenience layer that perorms an affine transform followed by a ReLU

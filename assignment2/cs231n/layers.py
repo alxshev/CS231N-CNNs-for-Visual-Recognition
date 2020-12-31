@@ -1,8 +1,6 @@
 from builtins import range
 import numpy as np
 
-
-
 def affine_forward(x, w, b):
     """
     Computes the forward pass for an affine (fully-connected) layer.
@@ -782,7 +780,6 @@ def svm_loss(x, y):
     dx[np.arange(N), y] -= num_pos
     dx /= N
     return loss, dx
-
 
 def softmax_loss(x, y):
     """

@@ -55,8 +55,10 @@ class TwoLayerNet(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        self.params['W1'] = np.random.randn(hidden_dim, input_dim) * weight_scale
+        self.params['W1'] = np.random.randn(input_dim, hidden_dim) * weight_scale
         self.params['W2'] = np.random.randn(hidden_dim, num_classes) * weight_scale
+        # print('W1 shape', self.params['W1'].shape)
+        # print('hidden dim', hidden_dim)Z
         self.params['b1'] = np.zeros(hidden_dim)
         self.params['b2'] = np.zeros(num_classes)
 
@@ -140,7 +142,8 @@ class FullyConnectedNet(object):
     """
     A fully-connected neural network with an arbitrary number of hidden layers,
     ReLU nonlinearities, and a softmax loss function. This will also implement
-    dropout and batch/layer normalization as options. For a network with L layers,
+    dropout and batch/layer normalizati
+    on as options. For a network with L layers,
     the architecture will be
 
     {affine - [batch/layer norm] - relu - [dropout]} x (L - 1) - affine - softmax
@@ -191,6 +194,7 @@ class FullyConnectedNet(object):
         self.num_layers = 1 + len(hidden_dims)
         self.dtype = dtype
         self.params = {}
+        self.num_classes = num_classes
 
         ############################################################################
         # TODO: Initialize the parameters of the network, storing all values in    #
@@ -205,9 +209,17 @@ class FullyConnectedNet(object):
         # parameters should be initialized to zeros.                               #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-        pass
-
+        last_layer_dims = input_dim
+        for l in range(1, self.num_layers):
+            current_layer_dims = hidden_dims[l - 1]
+            self.params[f"W{l}"] = np.random.randn(last_layer_dims, current_layer_dims) * weight_scale
+            self.params[f"b{l}"] = np.random.randn(current_layer_dims) * weight_scale
+            last_layer_dims = hidden_dims[l - 1]            
+        
+        L = self.num_layers
+        current_layer_dims = num_classes
+        self.params[f"W{L}"] = np.random.randn(last_layer_dims, current_layer_dims) * weight_scale
+        self.params[f"b{L}"] = np.random.randn(current_layer_dims) * weight_scale
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #
@@ -267,9 +279,17 @@ class FullyConnectedNet(object):
         # layer, etc.                                                              #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+        out = X
+        caches = []
+        for l in range(1, self.num_layers):
+            out, cache = affine_relu_forward(out, self.params[f"W{l}"], self.params[f"b{l}"])
+            caches.append(cache)
 
-        pass
-
+        # Forward prop last layer
+        L = self.num_layers
+        out, cache = affine_forward(out, self.params[f"W{L}"], self.params[f"b{L}"])
+        caches.append(cache)
+        scores = out
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #
@@ -294,9 +314,20 @@ class FullyConnectedNet(object):
         # of 0.5 to simplify the expression for the gradient.                      #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+        loss, dout = softmax_loss(scores, y)
 
-        pass
+        # Backprop last layer
+        dout, grads[f"W{L}"], grads[f"b{L}"] = affine_backward(dout, caches.pop())
 
+        # Other layers
+        for l in range(self.num_layers - 1, 0, -1):
+            dout, grads[f"W{l}"], grads[f"b{l}"] = affine_relu_backward(dout, caches.pop())
+
+        # Add regularization
+        for name, weights in self.params.items():
+            if 'W' in name:
+                loss += 0.5 * self.reg * (weights ** 2).sum()
+                grads[name] += self.reg * weights
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #
