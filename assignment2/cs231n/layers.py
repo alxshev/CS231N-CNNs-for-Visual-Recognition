@@ -198,9 +198,21 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         # might prove to be helpful.                                          #
         #######################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+        mu = x.mean(axis=0) # [D]
+        delta = x - mu # [N x D]
+        delta2 = delta ** 2 # [N x D]
+        var = delta2.sum(axis=0) / N # [D]
+        std = np.sqrt(var) # [D]
+        normed = delta / (std + eps) # [N x D]
+        gamma_x_normed = gamma * normed # [N x D]
+        out = gamma_x_normed + beta # [N x D]
 
-        pass
+        # x_normalized = (x - mean) / (std + eps)
+        running_mean = momentum * running_mean + (1 - momentum) * mu
+        running_var = momentum * running_var + (1 - momentum) * std ** 2
+        # out = gamma * x_normalized + beta
 
+        cache = (x, mu, delta, delta2, var, std, normed, gamma, eps, out)
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         #######################################################################
         #                           END OF YOUR CODE                          #
@@ -214,7 +226,9 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         #######################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        x = (x - running_mean) / (np.sqrt(running_var) + eps)
+        x = gamma * x + beta
+        out = x
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         #######################################################################
@@ -228,6 +242,59 @@ def batchnorm_forward(x, gamma, beta, bn_param):
     bn_param["running_var"] = running_var
 
     return out, cache
+
+def divide_forward(a, b, eps):
+    cache = (a, b, eps)
+    out = a / (b + eps)
+    return (out, cache)
+
+def divide_backward(dout, cache):
+    a, b, eps = cache
+    da = dout / (b + eps)
+    db = (- a * dout / (b + eps) ** 2).sum(axis=0)
+    return (da, db)
+
+def std_forward(delta):
+    N = delta.shape[0]
+
+    deltaSq = delta ** 2 # [N x D]
+    var = deltaSq.sum(axis=0) / N # [D]
+    std = np.sqrt(var) # [D]
+
+    out = std
+    cache = (delta, std)
+    return out, cache
+
+def std_backward(dout, cache):
+    delta, std = cache
+    N, D = delta.shape
+
+    dstd = dout # [D]
+    dVar = dstd / (2 * std) # [D]
+    dDeltaSq = np.ones((N, D)) * dVar / N # [N x D]
+    dDelta = 2 * delta * dDeltaSq # [N x D]
+
+    return dDelta
+
+def substractMean_forward(X):
+    out = X - X.mean(axis=0)
+    cache = X
+    return out, cache
+
+def substractMean_backward(dout, cache):
+    X = cache
+    
+    N, D = X.shape
+    # dout has shape [N x D]
+
+    dX1 = dout
+    
+    dmu = - dout.sum(axis=0) # [D]
+    dX2 = np.ones((N, D)) * dmu / N # [N x D]
+
+    dX = dX1 + dX2
+    return dX
+
 
 
 def batchnorm_backward(dout, cache):
@@ -255,8 +322,44 @@ def batchnorm_backward(dout, cache):
     # might prove to be helpful.                                              #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    X, mu, delta, delta2, var, std, normed, gamma, eps, out = cache
+    N, D = X.shape
 
-    pass
+    dbeta = dout.sum(axis=0) # [D]
+    dgamma = (normed * dout).sum(axis=0) # [D]
+    dnormed = gamma * dout # [N x D]
+
+    # =============== Modular Solution =====================
+    divide_cache = (delta, std, eps)
+    dDelta1, dSigma = divide_backward(dnormed, divide_cache)
+
+    std_cache = (delta, std)
+    dDelta2 = std_backward(dSigma, std_cache)
+
+    dDelta = dDelta1 + dDelta2
+
+    subtractMean_cache = X
+    dx = substractMean_backward(dDelta, subtractMean_cache)
+
+
+    #=============== Non-modular Solution ==================
+    # # Find delta1
+    # dDelta1 = dnormed / (std + eps) # [N x D]
+    # # Find delta2
+    # dstd = (-(X - mu) / ((std + eps) ** 2) * dnormed).sum(axis=0) # [D]
+    # dvar = dstd / (2 * std) # [D]
+    # dDeltaSq = np.ones((N, D)) * dvar / N # [N x D]
+    # dDelta2 = 2 * (X - mu) * dDeltaSq # [N x D]
+    # # Combine
+    # dout_ = dDelta1 + dDelta2 # [N x D]
+
+    # # Find dX1
+    # dX1 = dout_ # [N x D]
+    # # Find dX2
+    # dmu = -dout_.sum(axis=0) # [D]
+    # dX2 = np.ones((N, D)) * dmu / N # [N x D]
+    # # Combine
+    # dx = dX1 + dX2
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
