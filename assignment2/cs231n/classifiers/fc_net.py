@@ -303,6 +303,10 @@ class FullyConnectedNet(object):
                 out, cache = affine_layernorm_relu_forward(out, W, b, gamma, beta, bn_param)
             else:
                 out, cache = affine_relu_forward(out, self.params[f"W{l}"], self.params[f"b{l}"])
+            # Dropout
+            if self.use_dropout:
+                out, dropout_cache = dropout_forward(out, self.dropout_param)
+                cache += (dropout_cache,)
             caches.append(cache)
 
         # Forward prop last layer
@@ -339,14 +343,18 @@ class FullyConnectedNet(object):
         # Backprop last layer
         dout, grads[f"W{L}"], grads[f"b{L}"] = affine_backward(dout, caches.pop())
 
-        # Other layers
         for l in range(self.num_layers - 1, 0, -1):
+            cache = caches.pop()
+            if self.use_dropout:
+                dout = dropout_backward(dout, cache[-1])
+                cache = cache[:-1]
+            # print(len(cache))
             if self.normalization == "batchnorm":
-                dout, grads[f"W{l}"], grads[f"b{l}"], grads[f"gamma{l}"], grads[f"beta{l}"] = affine_batchnorm_relu_backward(dout, caches.pop())
+                dout, grads[f"W{l}"], grads[f"b{l}"], grads[f"gamma{l}"], grads[f"beta{l}"] = affine_batchnorm_relu_backward(dout, cache)
             elif self.normalization == "layernorm":
-                dout, grads[f"W{l}"], grads[f"b{l}"], grads[f"gamma{l}"], grads[f"beta{l}"] = affine_layernorm_relu_backward(dout, caches.pop())
+                dout, grads[f"W{l}"], grads[f"b{l}"], grads[f"gamma{l}"], grads[f"beta{l}"] = affine_layernorm_relu_backward(dout, cache)
             else:
-                dout, grads[f"W{l}"], grads[f"b{l}"] = affine_relu_backward(dout, caches.pop())
+                dout, grads[f"W{l}"], grads[f"b{l}"] = affine_relu_backward(dout, cache)
 
         # Add regularization
         for name, weights in self.params.items():
