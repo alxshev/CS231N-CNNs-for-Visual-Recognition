@@ -209,17 +209,27 @@ class FullyConnectedNet(object):
         # parameters should be initialized to zeros.                               #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+
+        # Layer weights and biases
+        L = self.num_layers
         last_layer_dims = input_dim
-        for l in range(1, self.num_layers):
+
+        for l in range(1, L):
             current_layer_dims = hidden_dims[l - 1]
             self.params[f"W{l}"] = np.random.randn(last_layer_dims, current_layer_dims) * weight_scale
             self.params[f"b{l}"] = np.random.randn(current_layer_dims) * weight_scale
+            
+            if normalization in ["batchnorm", "layernorm"]:
+                self.params[f"gamma{l}"] = np.ones(current_layer_dims)
+                self.params[f"beta{l}"] = np.zeros(current_layer_dims)
+            
             last_layer_dims = hidden_dims[l - 1]            
         
-        L = self.num_layers
+        
         current_layer_dims = num_classes
         self.params[f"W{L}"] = np.random.randn(last_layer_dims, current_layer_dims) * weight_scale
         self.params[f"b{L}"] = np.random.randn(current_layer_dims) * weight_scale
+
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #
@@ -281,8 +291,18 @@ class FullyConnectedNet(object):
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         out = X
         caches = []
+        cache = None
         for l in range(1, self.num_layers):
-            out, cache = affine_relu_forward(out, self.params[f"W{l}"], self.params[f"b{l}"])
+            if self.normalization == "batchnorm":
+                W, b, gamma, beta = [self.params[x + str(l)]  for x in ["W", "b", "gamma", "beta"]]
+                bn_param = self.bn_params[l - 1]
+                out, cache = affine_batchnorm_relu_forward(out, W, b, gamma, beta, bn_param)
+            elif self.normalization == "layernorm":
+                W, b, gamma, beta = [self.params[x + str(l)]  for x in ["W", "b", "gamma", "beta"]]
+                bn_param = self.bn_params[l - 1]
+                out, cache = affine_layernorm_relu_forward(out, W, b, gamma, beta, bn_param)
+            else:
+                out, cache = affine_relu_forward(out, self.params[f"W{l}"], self.params[f"b{l}"])
             caches.append(cache)
 
         # Forward prop last layer
@@ -321,7 +341,12 @@ class FullyConnectedNet(object):
 
         # Other layers
         for l in range(self.num_layers - 1, 0, -1):
-            dout, grads[f"W{l}"], grads[f"b{l}"] = affine_relu_backward(dout, caches.pop())
+            if self.normalization == "batchnorm":
+                dout, grads[f"W{l}"], grads[f"b{l}"], grads[f"gamma{l}"], grads[f"beta{l}"] = affine_batchnorm_relu_backward(dout, caches.pop())
+            elif self.normalization == "layernorm":
+                dout, grads[f"W{l}"], grads[f"b{l}"], grads[f"gamma{l}"], grads[f"beta{l}"] = affine_layernorm_relu_backward(dout, caches.pop())
+            else:
+                dout, grads[f"W{l}"], grads[f"b{l}"] = affine_relu_backward(dout, caches.pop())
 
         # Add regularization
         for name, weights in self.params.items():

@@ -6,6 +6,41 @@ pass
 from .layers import *
 from .fast_layers import *
 
+def affine_layernorm_relu_forward(x, w, b, gamma, beta, bn_param):
+    out = x
+    out, affine_cache = affine_forward(out, w, b)
+    out, layernorm_cache = layernorm_forward(out, gamma, beta, bn_param)
+    out, relu_cache = relu_forward(out)
+    
+    return out, (affine_cache, layernorm_cache, relu_cache)
+
+def affine_layernorm_relu_backward(dout, cache):
+    affine_cache, layernorm_cache, relu_cache = cache
+    
+    dx = dout
+    dx = relu_backward(dx, relu_cache)
+    dx, dgamma, dbeta = layernorm_backward(dx, layernorm_cache)
+    dx, dw, db = affine_backward(dx, affine_cache)
+    
+    return dx, dw, db, dgamma, dbeta
+
+def affine_batchnorm_relu_forward(x, w, b, gamma, beta, bn_param):
+    out = x
+    out, affine_cache = affine_forward(out, w, b)
+    out, batchnorm_cache = batchnorm_forward(out, gamma, beta, bn_param)
+    out, relu_cache = relu_forward(out)
+    return out, (affine_cache, batchnorm_cache, relu_cache)
+
+def affine_batchnorm_relu_backward(dout, cache):
+    affine_cache, batchnorm_cache, relu_cache = cache
+    
+    dx = dout
+    dx = relu_backward(dx, relu_cache)
+    dx, dgamma, dbeta = batchnorm_backward_alt(dx, batchnorm_cache)
+    dx, dw, db = affine_backward(dx, affine_cache)
+    
+    return dx, dw, db, dgamma, dbeta
+
 def affine_relu_forward(x, w, b):
     """
     Convenience layer that perorms an affine transform followed by a ReLU

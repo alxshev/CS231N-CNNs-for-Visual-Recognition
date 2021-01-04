@@ -198,21 +198,16 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         # might prove to be helpful.                                          #
         #######################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-        mu = x.mean(axis=0) # [D]
-        delta = x - mu # [N x D]
-        delta2 = delta ** 2 # [N x D]
-        var = delta2.sum(axis=0) / N # [D]
-        std = np.sqrt(var + eps) # [D]
-        normed = delta / std # [N x D]
-        gamma_x_normed = gamma * normed # [N x D]
-        out = gamma_x_normed + beta # [N x D]
+        mu = x.mean(axis=0)
+        var = ((x - mu) ** 2).mean(axis=0) # [D]
+        std = np.sqrt(var + eps)
+        z = (x - mu) / std # [N x D]
+        out = gamma * z + beta # [N x D]
 
-        # x_normalized = (x - mean) / (std + eps)
         running_mean = momentum * running_mean + (1 - momentum) * mu
-        running_var = momentum * running_var + (1 - momentum) * std ** 2
-        # out = gamma * x_normalized + beta
+        running_var = momentum * running_var + (1 - momentum) * var
 
-        cache = (x, mu, delta, delta2, var, std, normed, gamma, out)
+        cache = (x, std, z, gamma)
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         #######################################################################
         #                           END OF YOUR CODE                          #
@@ -226,9 +221,8 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         #######################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        x = (x - running_mean) / (np.sqrt(running_var) + eps)
-        x = gamma * x + beta
-        out = x
+        out = (x - running_mean) / np.sqrt(running_var + eps)
+        out = gamma * out + beta
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         #######################################################################
@@ -322,16 +316,17 @@ def batchnorm_backward(dout, cache):
     # might prove to be helpful.                                              #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-    X, mu, delta, delta2, var, std, normed, gamma, out = cache
+    X, std, z, gamma = cache
     N, D = X.shape
 
     dbeta = dout.sum(axis=0) # [D]
-    dgamma = (normed * dout).sum(axis=0) # [D]
-    dnormed = gamma * dout # [N x D]
+    dgamma = (z * dout).sum(axis=0) # [D]
+    dz = gamma * dout # [N x D]
 
     # =============== Modular Solution =====================
+    delta = X - X.mean(axis=0)
     divide_cache = (delta, std)
-    dDelta1, dSigma = divide_backward(dnormed, divide_cache)
+    dDelta1, dSigma = divide_backward(dz, divide_cache)
 
     std_cache = (delta, std)
     dDelta2 = std_backward(dSigma, std_cache)
@@ -344,9 +339,9 @@ def batchnorm_backward(dout, cache):
 
     #=============== Non-modular Solution ==================
     # Find delta1
-    # dDelta1 = dnormed / (std) # [N x D]
+    # dDelta1 = dz / (std) # [N x D]
     # # Find delta2
-    # dstd = (-(X - mu) / ((std_cache) ** 2) * dnormed).sum(axis=0) # [D]
+    # dstd = (-(X - mu) / ((std_cache) ** 2) * dz).sum(axis=0) # [D]
     # dvar = dstd / (2 * std) # [D]
     # dDeltaSq = np.ones((N, D)) * dvar / N # [N x D]
     # dDelta2 = 2 * (X - mu) * dDeltaSq # [N x D]
@@ -393,20 +388,15 @@ def batchnorm_backward_alt(dout, cache):
     # single statement; our implementation fits on a single 80-character line.#
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-    X, mu, delta, delta2, var, std, normed, gamma, out = cache
-    N, D = X.shape
+    x, std, z, gamma = cache
 
     dbeta = dout.sum(axis=0) # [D]
-    dgamma = (normed * dout).sum(axis=0) # [D]
-    # dx = np.zeros((N, D))
-    # dnormed = gamma * dout # [N x D]
+    dgamma = (z * dout).sum(axis=0) # [D]
 
-    S = dout.sum(axis=0) / N
-    M = (dout * delta).sum(axis=0) / N
-    dx = gamma / std * (dout - S - delta / (std ** 2) * M)
+    dz = gamma * dout
+    dx = dz - dz.mean(axis=0) - z * (gamma * dout * z).mean(axis=0)
+    dx /= std
 
-
-    # print(dx)
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
     #                             END OF YOUR CODE                            #
@@ -447,11 +437,25 @@ def layernorm_forward(x, gamma, beta, ln_param):
     # implementation of  batch normalization, and inserting a line or two of  #
     # well-placed code. In particular, can you think of any matrix            #
     # transformations you could perform, that would enable you to copy over   #
-    # the batch norm code and leave it almost unchanged?                      #
+    # the batch norm code and leave it almost unchanged? Yes, take the transpose                     #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    # Transform params
+    N = x.shape[0]
+    x = x.T
+    gamma = gamma[:, None]
+    beta = beta[:, None]
 
-    pass
+    # Apply batchnorm methods
+    mu = x.mean(axis=0)
+    var = ((x - mu) ** 2).mean(axis=0) # [D]
+    std = np.sqrt(var + eps)
+    z = (x - mu) / std # [N x D]
+    out = gamma * z + beta # [N x D]
+
+    # out, cache = batchnorm_forward(x.T, gamma[:, None], beta[:, None], ln_param)
+    out = out.T
+    cache = (x, std, z, gamma)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -485,8 +489,10 @@ def layernorm_backward(dout, cache):
     # still apply!                                                            #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-    pass
+    x, std, z, gamma = cache
+    dbeta = dout.sum(axis=0)
+    dgamma = np.sum(dout * z.T, axis=0)
+    dx = batchnorm_backward_alt(dout.T, cache)[0].T
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
