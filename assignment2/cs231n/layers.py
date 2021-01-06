@@ -627,8 +627,51 @@ def conv_forward_naive(x, w, b, conv_param):
     # Hint: you can use the function np.pad for padding.                      #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    stride, pad = conv_param["stride"], conv_param["pad"]
+    N, C, H, W = x.shape
+    F, C, HH, WW = w.shape
+    # print('w shape', w.shape)
+    Hprime = 1 + (H + 2 * pad - HH) // stride
+    Wprime = 1 + (W + 2 * pad - WW) // stride
 
-    pass
+    pad_width = [(0, 0), (0, 0), (pad, pad), (pad, pad)]
+    padded = np.pad(x, pad_width)
+    out = np.zeros((N, F, Hprime, Wprime))
+
+    # --------------- Method using matrix multiplication ------------------------   
+    w_row = w.reshape((F, -1))
+    for i in range(N):
+        x_i = padded[i, :, :]
+        x_col = np.zeros((C * HH * WW, Hprime * Wprime))
+        for hprime in range(Hprime):
+            for wprime in range(Wprime):
+                ay = hprime * stride
+                by = ay + HH
+                ax = wprime * stride
+                bx = ax + WW
+
+                index = hprime * Hprime + wprime
+                x_col[:, index] = x_i[:, ay:by, ax:bx].reshape(-1) # collapse matrix
+
+        score_i = (w_row @ x_col).reshape((F, Hprime, Wprime))
+        out[i, :, :, :] = score_i + b[:, None, None]
+
+    # -------------- Method using array traversal ---------------------
+    # for i in range(N):
+    #     x_i = padded[i, :, :]
+    #     score_i = np.zeros((F, Hprime, Wprime))
+    #     for filter_num in range(F):
+    #         for hprime in range(Hprime):
+    #             for wprime in range(Wprime):
+    #                 row = hprime * stride
+    #                 col = wprime * stride
+
+    #                 v = x_i[:, row : row + HH, col : col + WW]
+    #                 f = w[filter_num, :, :]
+    #                 convolved = (v * f).sum()
+    #                 score_i[filter_num, hprime, wprime] = convolved + b[filter_num]
+    #     out[i] = score_i
+
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -656,9 +699,59 @@ def conv_backward_naive(dout, cache):
     # TODO: Implement the convolutional backward pass.                        #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    x, w, b, conv_param = cache
+    stride, pad = conv_param["stride"], conv_param["pad"]
+    N, C, H, W = x.shape
+    F, C, HH, WW = w.shape
+    Hprime = 1 + (H + 2 * pad - HH) // stride
+    Wprime = 1 + (W + 2 * pad - WW) // stride
 
-    pass
+    db = dout.sum(axis=(0, 2, 3)) # sum across examples, width and height (everything but filters)
+    dx = np.zeros_like(x)
+    dw = np.zeros_like(w)
 
+    # # Idea: repeat convolution procedure, constructing dx as you go
+
+    # Semi-Vectorized
+    for hprime in range(Hprime):
+        for wprime in range(Wprime):
+            ay = hprime * stride
+            ax = wprime * stride
+            grad_cell = dout[:, :, hprime, wprime, None]
+            for convrow in range(HH):
+                for convcol in range(WW):
+                    iX = ay + convrow - pad # unpad indices
+                    jX = ax + convcol - pad # unpad indices
+                    if not (0 <= iX < H and 0 <= jX < W):
+                        continue
+                    kernel_weight = w[None, :, :, convrow, convcol]
+                    x_weight = x[:, None, :, iX, jX]
+                    dx[:, :, iX, jX] += (kernel_weight * grad_cell).sum(axis=1)
+                    dw[:, :, convrow, convcol] += (x_weight * grad_cell).sum(axis=0)
+
+    # Unvectorized
+    # for i in range(N):
+    #     for filter_num in range(F):
+    #         for hprime in range(Hprime):
+    #             for wprime in range(Wprime):
+    #                 ay = hprime * stride
+    #                 ax = wprime * stride
+    #                 f = w[filter_num]
+    #                 grad_cell = dout[i, filter_num, hprime, wprime]
+    #                 for channel in range(C):
+    #                     for convrow in range(HH):
+    #                         for convcol in range(WW):
+    #                             iX = ay + convrow - pad # unpad indices
+    #                             jX = ax + convcol - pad # unpad indices
+                        
+    #                             if not (0 <= iX < H and 0 <= jX < W):
+    #                                 continue
+    #                             kernel_weight = f[channel, convrow, convcol]
+    #                             # print(f.shape)
+    #                             x_weight = x[i, channel, iX, jX]
+    #                             # print(kernel_weight.shape, grad_cell.shape)
+    #                             dx[i, channel, iX, jX] += kernel_weight * grad_cell
+    #                             dw[filter_num, channel, convrow, convcol] += x_weight * grad_cell
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
     #                             END OF YOUR CODE                            #
@@ -690,8 +783,22 @@ def max_pool_forward_naive(x, pool_param):
     # TODO: Implement the max-pooling forward pass                            #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    N, C, H, W = x.shape
+    stride, pool_height, pool_width = pool_param["stride"], pool_param["pool_height"], pool_param["pool_width"]
+    Hprime = 1 + (H - pool_height) // stride
+    Wprime = 1 + (W - pool_width) // stride
 
-    pass
+    out = np.zeros((N, C, Hprime, Wprime))
+    # for n in range(N):
+    # x_i = x[n]
+    for i in range(Hprime):
+        for j in range(Wprime):
+            ay = i * stride
+            by = ay + pool_height
+            ax = j * stride
+            bx = ax + pool_width
+            out[:, :, i, j] = x[:, :, ay:by, ax:bx].max(axis=(2, 3))
+
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
