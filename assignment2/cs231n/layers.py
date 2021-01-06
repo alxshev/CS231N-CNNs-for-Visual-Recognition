@@ -789,8 +789,6 @@ def max_pool_forward_naive(x, pool_param):
     Wprime = 1 + (W - pool_width) // stride
 
     out = np.zeros((N, C, Hprime, Wprime))
-    # for n in range(N):
-    # x_i = x[n]
     for i in range(Hprime):
         for j in range(Wprime):
             ay = i * stride
@@ -824,9 +822,27 @@ def max_pool_backward_naive(dout, cache):
     # TODO: Implement the max-pooling backward pass                           #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    x,  pool_param = cache
+    N, CHANNELS, H, W = x.shape # Pro tip: don't use C for channels. Spent an hour after a scoping problem where I set C to the # of columns locally :))))
+    stride, pool_height, pool_width = pool_param["stride"], pool_param["pool_height"], pool_param["pool_width"]
+    Hprime = 1 + (H - pool_height) // stride
+    Wprime = 1 + (W - pool_width) // stride
 
-    pass
-
+    dx = np.zeros_like(x)
+    for i in range(Hprime):
+        for j in range(Wprime):
+            ay = i * stride
+            by = ay + pool_height
+            ax = j * stride
+            bx = ax + pool_width
+            for n in range(N):
+                for channel in range(CHANNELS):
+                    M = x[n, channel, ay:by, ax:bx]
+                    ROWS, COLS = M.shape
+                    maxIndex = M.argmax() # harder to vectorize since NumPy doesn't allow multi-axis argmax :()
+                    rowMax = maxIndex // ROWS + ay
+                    colMax = maxIndex % COLS + ax
+                    dx[n, channel, rowMax, colMax] = dout[n, channel, i, j]
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
     #                             END OF YOUR CODE                            #

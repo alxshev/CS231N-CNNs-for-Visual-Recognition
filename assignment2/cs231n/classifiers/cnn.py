@@ -62,8 +62,24 @@ class ThreeLayerConvNet(object):
         # the start of the loss() function to see how that happens.                #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+        self.reg = reg
+        CHANNELS, H, W = input_dim
+        self.H_POOL= H // 2 # layer size after max pool
+        self.W_POOL = W // 2
+        self.num_filters = num_filters
 
-        pass
+        # conv layer, initialize kernel weights
+        self.params['W1'] = np.random.randn(num_filters, CHANNELS, filter_size, filter_size) * weight_scale 
+        self.params['b1'] = np.zeros(num_filters)
+
+        # affine-relu layer
+        unrolled_dim = num_filters * self.H_POOL * self.W_POOL
+        self.params['W2'] = np.random.randn(unrolled_dim, hidden_dim) * weight_scale
+        self.params['b2'] = np.zeros(hidden_dim)
+
+        # final affine layer
+        self.params['W3'] = np.random.randn(hidden_dim, num_classes) * weight_scale
+        self.params['b3'] = np.zeros(num_classes)
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -101,9 +117,18 @@ class ThreeLayerConvNet(object):
         # cs231n/layer_utils.py in your implementation (already imported).         #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-        pass
-
+        N, CHANNELS, H, W = X.shape
+        cache = [None] * 3
+        # conv-relu-pool layer
+        out, cache[0] = conv_relu_pool_forward(X, W1, b1, conv_param, pool_param)
+        # flatten
+        # print('out shape before', out.shape)
+        out = out.reshape((N, -1))
+        # affine-relu layer
+        out, cache[1] = affine_relu_forward(out, W2, b2)
+        # last affine layer
+        out, cache[2] = affine_forward(out, W3, b3)
+        scores = out
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #
@@ -125,8 +150,19 @@ class ThreeLayerConvNet(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        loss, dout = softmax_loss(scores, y)
 
+        dout, grads["W3"], grads["b3"] = affine_backward(dout, cache.pop())
+        dout, grads["W2"], grads["b2"] = affine_relu_backward(dout, cache.pop())
+        # print('dout shape ', dout.shape)
+        # print(filter_size, self.H_POOL, self.W_POOL)
+        dout = dout.reshape(N, self.num_filters, self.H_POOL, self.W_POOL)# unflatten
+        dout, grads["W1"], grads["b1"] = conv_relu_pool_backward(dout, cache.pop())
+
+        # Add regularization
+        for key, weights in filter(lambda k: 'W' in k[0], self.params.items()):
+            grads[key] += self.reg * weights
+            loss += 0.5 * self.reg * (weights ** 2).sum()
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #
