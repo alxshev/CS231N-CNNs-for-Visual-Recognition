@@ -14,6 +14,8 @@ def visualize_grid(Xs, ubound=255.0, padding=1):
     - ubound: Output grid will have values scaled to the range [0, ubound]
     - padding: The number of blank pixels between elements of the grid
     """
+        
+    Han I remember you mentioned you will be around for term 2 and be able to help; what are some things I can do now?
     (N, H, W, C) = Xs.shape
     grid_size = int(ceil(sqrt(N)))
     grid_height = H * grid_size + padding * (grid_size - 1)

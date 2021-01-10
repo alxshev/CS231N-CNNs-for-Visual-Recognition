@@ -397,7 +397,6 @@ def batchnorm_backward_alt(dout, cache):
     dz = gamma * dout
     dx = dz - dz.mean(axis=0) - z * (gamma * dout * z).mean(axis=0)
     dx /= std
-
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
     #                             END OF YOUR CODE                            #
@@ -442,22 +441,16 @@ def layernorm_forward(x, gamma, beta, ln_param):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     # Transform params
-    N = x.shape[0]
-    x = x.T
-    gamma = gamma[:, None]
-    beta = beta[:, None]
+    N, D = x.shape
 
     # Apply batchnorm methods
-    mu = x.mean(axis=0)
-    var = ((x - mu) ** 2).mean(axis=0) # [D]
-    std = np.sqrt(var + eps)
+    mu = x.mean(axis=1).reshape((N, 1)) # [N x 1]
+    var = ((x - mu) ** 2).mean(axis=1).reshape((N, 1)) # [N x 1]
+    std = np.sqrt(var + eps) # [N x 1]
     z = (x - mu) / std # [N x D]
-    out = gamma * z + beta # [N x D]
+    out = gamma.reshape((1, D)) * z + beta.reshape((1, D)) # [N x D]
 
-    # out, cache = batchnorm_forward(x.T, gamma[:, None], beta[:, None], ln_param)
-    out = out.T
     cache = (x, std, z, gamma)
-
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
     #                             END OF YOUR CODE                            #
@@ -491,14 +484,18 @@ def layernorm_backward(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     x, std, z, gamma = cache
-    dbeta = dout.sum(axis=0)
-    dgamma = np.sum(dout * z.T, axis=0)
-    dx = batchnorm_backward_alt(dout.T, cache)[0].T
+    N, D = x.shape
 
+    dbeta = dout.sum(axis=0)
+    dgamma = np.sum(dout * z, axis=0)
+
+    batchnorm_cache = (x.T, std.reshape((1, N)), z.T, gamma.reshape((D, 1)))
+    dx = batchnorm_backward_alt(dout.T, batchnorm_cache)[0].T
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
+
     return dx, dgamma, dbeta
 
 
@@ -882,9 +879,10 @@ def spatial_batchnorm_forward(x, gamma, beta, bn_param):
     # Your implementation should be very short; ours is less than five lines. #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-    pass
-
+    N, C, H, W = x.shape
+    flat = x.transpose(0, 2, 3, 1).reshape((N * H * W, C))
+    flat, cache = batchnorm_forward(flat, gamma, beta, bn_param)
+    out = flat.reshape((N, H, W, C)).transpose(0, 3, 1, 2)
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
     #                             END OF YOUR CODE                            #
@@ -916,9 +914,10 @@ def spatial_batchnorm_backward(dout, cache):
     # Your implementation should be very short; ours is less than five lines. #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-    pass
-
+    N, C, H, W = dout.shape
+    dout_flat = dout.transpose(0, 2, 3, 1).reshape((N * H * W, C))
+    dx_flat, dgamma, dbeta = batchnorm_backward(dout_flat, cache)
+    dx = dx_flat.reshape((N, H, W, C)).transpose(0, 3, 1, 2)
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
     #                             END OF YOUR CODE                            #
@@ -956,8 +955,22 @@ def spatial_groupnorm_forward(x, gamma, beta, G, gn_param):
     # and layer normalization!                                                #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    # Shapes
+    N, C, H, W = x.shape
+    D = (C // G) * H * W
+    g_shape = (N * G, D)
+    s_shape = (1, C, 1, 1)
 
-    pass
+    gamma_fake = np.ones(D)
+    beta_fake = np.zeros(D)
+    z, layernorm_cache = layernorm_forward(x.reshape(g_shape), gamma_fake, beta_fake, gn_param)
+    
+    z = z.reshape(x.shape)
+    out = z * gamma.reshape(s_shape) + beta.reshape(s_shape)
+
+    # Layernorm cache has the form (xflat, std, zflat, gamma). Rewrite gamma
+    (_, std, _, _) = layernorm_cache
+    cache = (x, std, z, gamma, G)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -986,9 +999,24 @@ def spatial_groupnorm_backward(dout, cache):
     # This will be extremely similar to the layer norm implementation.        #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    # Shapes
+    x, std, z, gamma, G = cache
+    N, C, H, W = x.shape
+    D = (C // G) * H * W
+    g_shape = (N * G, D)
+    s_shape = (1, C, 1, 1)
 
-    pass
+    dbeta = dout.sum(axis=(0, 2, 3)).reshape(s_shape)
+    dgamma = (z * dout).sum(axis=(0, 2, 3)).reshape(s_shape)
+    
+    dx = np.zeros_like(x)
+    gamma_fake = np.ones(D)
 
+    # layernorm cache has the form (xflat, std, zflat, gamma)
+    layernorm_cache = (x.reshape(g_shape), std, z.reshape(g_shape), gamma_fake)
+
+    dx_flat, _, _ = layernorm_backward((dout * gamma).reshape(g_shape), layernorm_cache)
+    dx = dx_flat.reshape(x.shape)
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
     #                             END OF YOUR CODE                            #
