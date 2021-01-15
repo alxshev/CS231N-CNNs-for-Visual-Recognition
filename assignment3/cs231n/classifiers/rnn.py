@@ -151,8 +151,22 @@ class CaptioningRNN(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
-
+        # 1) Generate initial hidden state using image features
+        h0, cache_proj = affine_forward(features, W_proj, b_proj)
+        # 2) Embed words
+        words_embed, cache_embed = word_embedding_forward(captions_in, W_embed)
+        # 3) Feed it through RNN
+        h, cache_rnn = rnn_forward(words_embed, h0, Wx, Wh, b)
+        # h has shape (N, T, H)
+        # 4) Compute words scores
+        scores, cache_vocab = temporal_affine_forward(h, W_vocab, b_vocab)
+        # 5) Get losses
+        loss, dscores = temporal_softmax_loss(scores, captions_out, mask)
+        
+        # Backprop
+        dout, grads['W_vocab'], grads['b_vocab'] = temporal_affine_backward(dscores, cache_vocab)
+        _, dh0, grads['Wx'], grads['Wh'], grads['b'] = rnn_backward(dout, cache_rnn)
+        dfeatures, grads['W_proj'], grads['b_proj'] = affine_backward(dh0, cache_proj)
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #
