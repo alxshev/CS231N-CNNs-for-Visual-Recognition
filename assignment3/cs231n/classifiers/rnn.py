@@ -165,8 +165,9 @@ class CaptioningRNN(object):
         
         # Backprop
         dout, grads['W_vocab'], grads['b_vocab'] = temporal_affine_backward(dscores, cache_vocab)
-        _, dh0, grads['Wx'], grads['Wh'], grads['b'] = rnn_backward(dout, cache_rnn)
-        dfeatures, grads['W_proj'], grads['b_proj'] = affine_backward(dh0, cache_proj)
+        dwords_embed, dh0, grads['Wx'], grads['Wh'], grads['b'] = rnn_backward(dout, cache_rnn)
+        _, grads['W_proj'], grads['b_proj'] = affine_backward(dh0, cache_proj)
+        grads['W_embed'] = word_embedding_backward(dwords_embed, cache_embed)
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #
@@ -232,8 +233,21 @@ class CaptioningRNN(object):
         # you are using an LSTM, initialize the first cell state to zeros.        #
         ###########################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+        T = max_length
+        N, _ = features.shape
 
-        pass
+        captions[:, 0] = self._start
+        # Generate initial hidden state using image features
+        h, _ = affine_forward(features, W_proj, b_proj)
+        # Generate captions
+        for t in range(1, T):
+          # Embed words
+          word_embed, _ = word_embedding_forward(captions[:, t-1], W_embed) # (N, 1)
+          # Feed it through RNN
+          h, _ = rnn_step_forward(word_embed, h, Wx, Wh, b) # (N, H)
+          # compute scores and use best word as the next input
+          scores, _ = affine_forward(h, W_vocab, b_vocab) # (N, V)
+          captions[:, t] = scores.argmax(axis=1)
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
