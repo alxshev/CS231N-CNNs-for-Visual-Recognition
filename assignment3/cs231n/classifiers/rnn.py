@@ -156,7 +156,10 @@ class CaptioningRNN(object):
         # 2) Embed words
         words_embed, cache_embed = word_embedding_forward(captions_in, W_embed)
         # 3) Feed it through RNN
-        h, cache_rnn = rnn_forward(words_embed, h0, Wx, Wh, b)
+        if self.cell_type == 'lstm':
+          h, cache_rnn = lstm_forward(words_embed, h0, Wx, Wh, b)
+        else:
+          h, cache_rnn = rnn_forward(words_embed, h0, Wx, Wh, b)
         # h has shape (N, T, H)
         # 4) Compute words scores
         scores, cache_vocab = temporal_affine_forward(h, W_vocab, b_vocab)
@@ -165,7 +168,10 @@ class CaptioningRNN(object):
         
         # Backprop
         dout, grads['W_vocab'], grads['b_vocab'] = temporal_affine_backward(dscores, cache_vocab)
-        dwords_embed, dh0, grads['Wx'], grads['Wh'], grads['b'] = rnn_backward(dout, cache_rnn)
+        if self.cell_type == 'lstm':
+          dwords_embed, dh0, grads['Wx'], grads['Wh'], grads['b'] = lstm_backward(dout, cache_rnn)
+        else:
+          dwords_embed, dh0, grads['Wx'], grads['Wh'], grads['b'] = rnn_backward(dout, cache_rnn)
         _, grads['W_proj'], grads['b_proj'] = affine_backward(dh0, cache_proj)
         grads['W_embed'] = word_embedding_backward(dwords_embed, cache_embed)
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -239,12 +245,16 @@ class CaptioningRNN(object):
         captions[:, 0] = self._start
         # Generate initial hidden state using image features
         h, _ = affine_forward(features, W_proj, b_proj)
+        c = np.zeros_like(h)
         # Generate captions
         for t in range(1, T):
           # Embed words
           word_embed, _ = word_embedding_forward(captions[:, t-1], W_embed) # (N, 1)
           # Feed it through RNN
-          h, _ = rnn_step_forward(word_embed, h, Wx, Wh, b) # (N, H)
+          if self.cell_type == 'lstm':
+            h, c, _ = lstm_step_forward(word_embed, h, c, Wx, Wh, b) # (N, H)
+          else:
+            h, _ = rnn_step_forward(word_embed, h, Wx, Wh, b) # (N, H)
           # compute scores and use best word as the next input
           scores, _ = affine_forward(h, W_vocab, b_vocab) # (N, V)
           captions[:, t] = scores.argmax(axis=1)
