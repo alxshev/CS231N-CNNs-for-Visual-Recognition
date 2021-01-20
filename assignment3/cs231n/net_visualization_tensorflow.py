@@ -34,8 +34,18 @@ def compute_saliency_maps(X, y, model):
     # 4) Finally, process the returned gradient to compute the saliency map.      #
     ###############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-    pass
+    N = X.shape[0]
+    X = tf.convert_to_tensor(X)
+    with tf.GradientTape() as tape:
+      tape.watch(X)
+      scores = model.call(X)
+      exp_scores = tf.math.exp(scores)
+      correct_scores = tf.gather_nd(exp_scores, tf.stack((tf.range(N), y), axis=1))
+      loss_vector = -tf.math.log(correct_scores / tf.reduce_sum(exp_scores, axis=1))
+      loss = tf.reduce_sum(loss_vector, axis=0) / N
+      grad = tape.gradient(loss, X)
+    saliency = tf.math.reduce_max(tf.math.abs(grad), axis=-1)
+    
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
