@@ -93,9 +93,28 @@ def make_fooling_image(X, target_y, model):
     # progress over iterations to check your algorithm.                          #
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-    pass
-
+    X_fooling = tf.convert_to_tensor(X_fooling)
+    scores = model.call(X_fooling)
+    N = 1
+    y = np.array([target_y])
+    
+    while tf.math.argmax(scores, axis=1) != target_y:
+      with tf.GradientTape() as tape:
+        # forward pass and compute gradient
+        tape.watch(X_fooling)
+        scores = model.call(X_fooling)
+        exp_scores = tf.math.exp(scores)
+        correct_scores = tf.gather_nd(exp_scores, tf.stack((tf.range(N), y), axis=1))
+        loss_vector = -tf.math.log(correct_scores / tf.reduce_sum(exp_scores, axis=1))
+        loss = tf.reduce_sum(loss_vector, axis=0) / N
+        grad = tape.gradient(loss, X_fooling) # grad.shape == (1, H, W, 3)
+        
+        # update image/gradient ascent
+        dX = learning_rate * grad / tf.norm(grad)
+        X_fooling -= dX # subtract for gradient ascent
+        print(f"Score for target: {scores[0, target_y]}")
+        
+        
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
     #                             END OF YOUR CODE                               #
@@ -112,7 +131,24 @@ def class_visualization_update_step(X, model, target_y, l2_reg, learning_rate):
     # Be very careful about the signs of elements in your code.            #
     ########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    X = tf.convert_to_tensor(X)
+    y = np.array([target_y])
+    N = 1
 
+    with tf.GradientTape() as tape:
+      # forward pass and compute gradient
+      tape.watch(X)
+      scores = model.call(X)
+      exp_scores = tf.math.exp(scores)
+      correct_scores = tf.gather_nd(exp_scores, tf.stack((tf.range(N), y), axis=1))
+      loss_vector = -tf.math.log(correct_scores / tf.reduce_sum(exp_scores, axis=1))
+      loss = tf.reduce_sum(loss_vector, axis=0) / N
+      grad = tape.gradient(loss, X) # grad.shape == (1, H, W, 3)
+      
+      # update image/gradient ascent
+      dX = learning_rate * grad / tf.norm(grad) + 2 * grad 
+      X -= dX # subtract for gradient ascent
+      # print(f"Score for target: {scores[0, target_y]}")
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
